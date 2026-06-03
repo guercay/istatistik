@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hedef &amp; Performans — Çoklu Regresyon Deneyi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,900;1,9..144,500&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0a1d22; --ink-2:#0e272e;
+    --paper:#f3ead7; --paper-dim:#c9bfa8;
+    --line:#2a4a52;
+    --c-size:#7df0e0;   /* hedef boyutu */
+    --c-life:#f0b542;   /* hedef ömrü */
+    --accent:#7df0e0;
+    --good:#5fd6a0; --warn:#f0654f;
+    --shadow:0 18px 50px -20px rgba(0,0,0,.7);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    font-family:'Hanken Grotesk',sans-serif;
+    background:
+      radial-gradient(1100px 600px at 85% -10%, #16414a 0%, transparent 55%),
+      radial-gradient(900px 700px at -10% 110%, #123036 0%, transparent 50%),
+      var(--ink);
+    color:var(--paper);line-height:1.55;
+    padding:clamp(14px,3vw,40px);min-height:100vh;
+  }
+  .wrap{max-width:1080px;margin:0 auto}
+
+  header{
+    border:1px solid var(--line);border-radius:20px;
+    padding:clamp(22px,4vw,40px);
+    background:linear-gradient(160deg,rgba(20,55,62,.6),rgba(10,29,34,.3));
+    position:relative;overflow:hidden;box-shadow:var(--shadow);
+  }
+  .tag{font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:3px;
+    text-transform:uppercase;color:var(--accent);margin-bottom:14px}
+  h1{font-family:'Fraunces',serif;font-weight:900;font-size:clamp(28px,5.5vw,54px);
+    line-height:1.03;letter-spacing:-1px;margin-bottom:16px}
+  h1 em{font-style:italic;font-weight:500;color:var(--accent)}
+  .model-eq{
+    font-family:'JetBrains Mono',monospace;font-size:clamp(13px,2.1vw,17px);
+    background:rgba(0,0,0,.28);border:1px solid var(--line);border-radius:12px;
+    padding:14px 16px;margin-bottom:14px;line-height:1.9;overflow-x:auto;white-space:nowrap;
+  }
+  .model-eq .b{color:var(--accent);font-weight:700}
+  .model-eq .x1{color:var(--c-size)} .model-eq .x2{color:var(--c-life)}
+  .lead{max-width:64ch;color:var(--paper-dim);font-size:clamp(15px,2vw,18px)}
+
+  section{margin-top:clamp(22px,4vw,38px)}
+  .s-head{display:flex;align-items:baseline;gap:14px;margin-bottom:18px;flex-wrap:wrap}
+  .s-num{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--ink);
+    background:var(--accent);padding:3px 9px;border-radius:6px;font-weight:700}
+  .s-head h2{font-family:'Fraunces',serif;font-weight:600;font-size:clamp(22px,3.5vw,30px)}
+  .s-head p{color:var(--paper-dim);font-size:14px;width:100%;max-width:66ch}
+  .panel{border:1px solid var(--line);border-radius:18px;
+    background:linear-gradient(165deg,rgba(16,48,56,.55),rgba(10,29,34,.25));
+    padding:clamp(18px,3vw,28px)}
+
+  /* ARENA */
+  .arena-top{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+  .chip{flex:1;min-width:120px;border:1px solid var(--line);border-radius:12px;
+    padding:12px 14px;background:rgba(0,0,0,.18)}
+  .chip span{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--paper-dim);display:block}
+  .chip b{font-family:'JetBrains Mono',monospace;font-size:24px;font-weight:700}
+  .chip.size b{color:var(--c-size)} .chip.life b{color:var(--c-life)}
+  .chip.score b{color:var(--paper)}
+  #arena{position:relative;width:100%;height:330px;border:1.5px dashed var(--line);
+    border-radius:14px;overflow:hidden;cursor:crosshair;user-select:none;
+    background:radial-gradient(circle at 50% 50%, rgba(125,240,224,.05), transparent 70%),
+      repeating-linear-gradient(0deg,transparent 0 38px,rgba(255,255,255,.018) 38px 39px),
+      repeating-linear-gradient(90deg,transparent 0 38px,rgba(255,255,255,.018) 38px 39px)}
+  #arena.idle{cursor:default}
+  .target{position:absolute;border-radius:50%;cursor:pointer;
+    box-shadow:0 0 18px -2px currentColor, inset 0 0 12px rgba(255,255,255,.4);
+    transform:translate(-50%,-50%) scale(0);animation:pop .12s ease-out forwards}
+  @keyframes pop{to{transform:translate(-50%,-50%) scale(1)}}
+  .arena-msg{position:absolute;inset:0;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;text-align:center;padding:20px;gap:8px}
+  .arena-msg .big{font-family:'Fraunces',serif;font-size:24px}
+  .arena-msg .sub{color:var(--paper-dim);font-size:14px;max-width:46ch}
+
+  .btn{font-family:'Hanken Grotesk',sans-serif;font-weight:700;font-size:15px;border:none;
+    border-radius:11px;padding:13px 22px;cursor:pointer;background:var(--accent);color:var(--ink);
+    transition:.15s;letter-spacing:.3px}
+  .btn:hover{filter:brightness(1.08);transform:translateY(-1px)}
+  .btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
+  .btn.ghost{background:transparent;color:var(--paper);border:1.5px solid var(--line)}
+  .btn.ghost:hover{border-color:var(--paper-dim)}
+  .btn-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+  .hint{font-size:12.5px;color:var(--paper-dim);margin-top:10px;font-style:italic}
+
+  /* DATA TABLE */
+  .scroll{overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-family:'JetBrains Mono',monospace;font-size:13px}
+  th,td{padding:10px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+  th:first-child,td:first-child{text-align:left}
+  thead th{color:var(--accent);font-size:11px;text-transform:uppercase;letter-spacing:1px}
+  tbody tr:hover{background:rgba(125,240,224,.05)}
+  .empty{color:var(--paper-dim);text-align:center;padding:24px;font-family:'JetBrains Mono',monospace;font-size:13px}
+
+  /* REGRESSION OUTPUT */
+  .fit-eq{font-family:'JetBrains Mono',monospace;font-size:clamp(14px,2.3vw,19px);
+    background:rgba(0,0,0,.3);border:1px solid var(--line);border-radius:12px;
+    padding:16px 18px;margin-bottom:18px;line-height:1.8;overflow-x:auto;white-space:nowrap}
+  .fit-eq .num{color:var(--accent);font-weight:700}
+  .metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:18px}
+  @media(max-width:620px){.metrics{grid-template-columns:repeat(2,1fr)}}
+  .metric{border:1px solid var(--line);border-radius:12px;padding:14px;background:rgba(0,0,0,.18);text-align:center}
+  .metric b{font-family:'JetBrains Mono',monospace;font-size:24px;display:block}
+  .metric span{font-size:11px;color:var(--paper-dim);text-transform:uppercase;letter-spacing:.5px}
+  .sig-y{color:var(--good)} .sig-n{color:var(--paper-dim)}
+  .interp{margin-top:18px;padding:18px;border:1px solid var(--line);border-radius:14px;
+    background:rgba(0,0,0,.2);display:none}
+  .interp.show{display:block}
+  .interp .ih{font-family:'Fraunces',serif;font-size:20px;margin-bottom:10px}
+  .interp p{color:var(--paper-dim);font-size:14.5px;margin-bottom:8px}
+  .interp b{color:var(--paper)}
+
+  /* PLOTS */
+  .plots{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:720px){.plots{grid-template-columns:1fr}}
+  .plot-card h4{font-family:'Fraunces',serif;font-size:16px;margin-bottom:6px}
+  .plot-card .pd{font-size:12px;color:var(--paper-dim);margin-bottom:8px}
+  svg{width:100%;height:auto}
+
+  footer{margin-top:40px;text-align:center;color:var(--paper-dim);font-size:13px;
+    border-top:1px solid var(--line);padding-top:20px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="tag">Çoklu Doğrusal Regresyon · OLS · Eğitim Simülasyonu</div>
+    <h1>Hedefin özellikleri performansı <em>ne kadar</em> belirler?</h1>
+    <div class="model-eq">
+      Skor = <span class="b">β₀</span> + <span class="b">β₁</span>·<span class="x1">(HedefBoyutu)</span> + <span class="b">β₂</span>·<span class="x2">(HedefÖmrü)</span> + ε
+    </div>
+    <p class="lead">Her turda oyun, hedefin <b>boyutunu (px)</b> ve <b>ekranda kalma süresini (ms)</b> rastgele seçer; sen 15 saniye oynayınca <b>skor</b> oluşur. Her tur bir gözlem noktasıdır. Yeterli tur biriktirince En Küçük Kareler (OLS) yöntemiyle katsayıları (β) tahmin eder, her birinin anlamlılığını (t, p) ve modelin açıklama gücünü (R²) raporlarız.</p>
+  </header>
+
+  <!-- 1. OYNA -->
+  <section>
+    <div class="s-head">
+      <span class="s-num">01</span><h2>Deneyi oyna</h2>
+      <p>Her tur farklı bir hedef boyutu ve ömrüyle gelir. Daireler beliren yerde tıkla. Tur bitince (boyut, ömür, skor) üçlüsü veri tablosuna eklenir. Sağlıklı bir 2-yordayıcılı regresyon için en az ~8–10 tur önerilir.</p>
+    </div>
+    <div class="panel">
+      <div class="arena-top">
+        <div class="chip size"><span>Bu tur · Hedef boyutu</span><b id="cSize">— px</b></div>
+        <div class="chip life"><span>Bu tur · Hedef ömrü</span><b id="cLife">— ms</b></div>
+        <div class="chip score"><span>Skor (vuruş)</span><b id="cScore">0</b></div>
+        <div class="chip"><span>Süre (sn)</span><b id="cTime">15.0</b></div>
+      </div>
+      <div id="arena" class="idle">
+        <div class="arena-msg" id="arenaMsg">
+          <div class="big">Hazır olduğunda Başlat</div>
+          <div class="sub" id="armMsg">—</div>
+        </div>
+      </div>
+      <div class="btn-row"><button class="btn" id="startBtn">▶ Turu Başlat</button></div>
+      <div class="hint">İpucu: Boyut ve ömür her tur bağımsız değiştiği için bir yordayıcının etkisini diğerinden ayırabiliriz — çoklu regresyonun amacı tam da budur.</div>
+    </div>
+  </section>
+
+  <!-- 2. VERİ -->
+  <section>
+    <div class="s-head">
+      <span class="s-num">02</span><h2>Toplanan veri</h2>
+      <p>Her satır bir tur: yordayıcılar (X₁ = boyut, X₂ = ömür) ve sonuç (Y = skor). Ders gösterimi için örnek veri üretebilirsin.</p>
+    </div>
+    <div class="panel">
+      <div class="scroll">
+        <table id="dataTable">
+          <thead><tr><th>#</th><th>Hedef Boyutu (px)</th><th>Hedef Ömrü (ms)</th><th>Skor</th></tr></thead>
+          <tbody id="dataBody"><tr><td colspan="4" class="empty">Henüz veri yok — oyna ya da örnek veri üret</td></tr></tbody>
+        </table>
+      </div>
+      <div class="btn-row">
+        <button class="btn ghost" id="simBtn">⚗ Örnek veri üret (+10 tur)</button>
+        <button class="btn ghost" id="undoBtn">↶ Son turu sil</button>
+        <button class="btn ghost" id="clearBtn">⌫ Tümünü temizle</button>
+      </div>
+      <div style="margin-top:16px;border-top:1px solid var(--line);padding-top:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <button class="btn ghost" id="loadBtn">☁ Sınıf verisini yükle</button>
+        <span id="syncStatus" style="font-family:'JetBrains Mono',monospace;font-size:12.5px;color:var(--paper-dim)">Google Sheets: yapılandırılmadı (yerel mod)</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. REGRESYON -->
+  <section>
+    <div class="s-head">
+      <span class="s-num">03</span><h2>Regresyon çıktısı</h2>
+      <p>OLS ile β = (XᵀX)⁻¹XᵀY. Her katsayının standart hatası, t istatistiği ve iki yönlü p-değeri; ayrıca genel F-testi, R² ve düzeltilmiş R².</p>
+    </div>
+    <div class="panel">
+      <div class="fit-eq" id="fitEq">Skor = β₀ + β₁·Boyut + β₂·Ömür &nbsp;<span style="color:var(--paper-dim)">(hesaplanmadı)</span></div>
+      <div class="scroll">
+        <table id="coefTable">
+          <thead><tr><th>Yordayıcı</th><th>β (katsayı)</th><th>Std. Hata</th><th>t</th><th>p</th></tr></thead>
+          <tbody id="coefBody">
+            <tr><td>Sabit (β₀)</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+            <tr><td>Hedef Boyutu (β₁)</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+            <tr><td>Hedef Ömrü (β₂)</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="metrics">
+        <div class="metric"><b id="mR2">—</b><span>R²</span></div>
+        <div class="metric"><b id="mAdjR2">—</b><span>Düzeltilmiş R²</span></div>
+        <div class="metric"><b id="mF">—</b><span>F (model)</span></div>
+        <div class="metric"><b id="mP">—</b><span>Model p-değeri</span></div>
+      </div>
+      <div class="btn-row"><button class="btn" id="runBtn">∑ Regresyonu hesapla</button></div>
+      <div class="interp" id="interp"><div class="ih" id="ih"></div><div id="ip"></div></div>
+    </div>
+  </section>
+
+  <!-- 4. GÖRSEL -->
+  <section>
+    <div class="s-head">
+      <span class="s-num">04</span><h2>Görselleştirme</h2>
+      <p>İki yordayıcı + sonuç 3 boyutlu olduğundan tek bir doğru çizemeyiz. Bunun yerine modelin tahminlerini gerçek skorlarla karşılaştırırız.</p>
+    </div>
+    <div class="panel">
+      <div class="plots">
+        <div class="plot-card">
+          <h4>Tahmin ↔ Gerçek</h4>
+          <div class="pd">Noktalar kesik çizgiye (Ŷ = Y) ne kadar yakınsa model o kadar iyi.</div>
+          <svg id="pvaPlot" viewBox="0 0 360 320"></svg>
+        </div>
+        <div class="plot-card">
+          <h4>Artıklar (residuals)</h4>
+          <div class="pd">Hatalar 0 çizgisi etrafında rastgele dağılmalı; bir desen varsa model eksiktir.</div>
+          <svg id="resPlot" viewBox="0 0 360 320"></svg>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    Çoklu doğrusal regresyon · katsayılar normal denklemlerle (Gauss-Jordan tersi), p-değerleri t- ve F-dağılımlarından düzenlenmiş eksik beta fonksiyonuyla hesaplanır.
+  </footer>
+</div>
+
+<script>
+/* ===== AYARLAR ===== */
+const SIZE_MIN=24, SIZE_MAX=80;     // px
+const LIFE_MIN=500, LIFE_MAX=1700;  // ms
+const ROUND_MS=15000;
+const cssv=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+/* veri: her gözlem {size, life, score} */
+const rows=[];
+let next=null, playing=false;
+
+/* ===================== GOOGLE SHEETS ENTEGRASYONU ===================== */
+/* Apps Script web uygulaması URL'ini tırnakların arasına yapıştır.       */
+/* Boş bırakırsan sayfa eskisi gibi yerel modda (yalnız bu cihaz) çalışır. */
+const SHEET_URL  = "";           // ← BURAYA web app adresini yapıştır
+const SHEET_NAME = "regresyon";  // Sheet'teki sekme adı
+
+function setSync(msg){const el=document.getElementById('syncStatus'); if(el) el.textContent='Google Sheets: '+msg;}
+
+function sheetSendRow(payload){
+  if(!SHEET_URL) return;
+  setSync('kaydediliyor…');
+  fetch(SHEET_URL,{
+    method:'POST', mode:'no-cors',
+    headers:{'Content-Type':'text/plain;charset=utf-8'},
+    body: JSON.stringify(Object.assign({sheet:SHEET_NAME}, payload))
+  }).then(()=>setSync('kaydedildi ✓')).catch(()=>setSync('kayıt hatası ✕'));
+}
+
+function sheetLoadClass(){
+  if(!SHEET_URL){alert('Önce kodun başındaki SHEET_URL değerini Apps Script web uygulaması adresinle doldur.');return;}
+  setSync('sınıf verisi yükleniyor…');
+  const cb='__cb_'+Date.now();
+  const s=document.createElement('script');
+  window[cb]=function(resp){
+    try{delete window[cb];}catch(e){window[cb]=undefined;} s.remove();
+    if(!resp||!resp.ok){setSync('yükleme hatası ✕');return;}
+    rows.length=0;
+    resp.rows.forEach(r=>{               // r = [timestamp, boyut, omur, skor]
+      const o={size:Number(r[1]), life:Number(r[2]), score:Number(r[3])};
+      if(!isNaN(o.size)&&!isNaN(o.life)&&!isNaN(o.score)) rows.push(o);
+    });
+    setSync('sınıf verisi yüklendi ✓ ('+rows.length+' kayıt)');
+    resetOut(); renderData();
+  };
+  s.src=SHEET_URL+'?sheet='+SHEET_NAME+'&callback='+cb;
+  s.onerror=()=>{setSync('yükleme hatası ✕');};
+  document.body.appendChild(s);
+}
+document.addEventListener('DOMContentLoaded',()=>{
+  document.getElementById('loadBtn').addEventListener('click',sheetLoadClass);
+  if(SHEET_URL) setSync('bağlandı — oynanan turlar otomatik kaydedilir');
+});
+/* ===================================================================== */
+
+/* ===== TUR HAZIRLA ===== */
+function armRound(){
+  const size=Math.round(SIZE_MIN+Math.random()*(SIZE_MAX-SIZE_MIN));
+  const life=Math.round((LIFE_MIN+Math.random()*(LIFE_MAX-LIFE_MIN))/50)*50;
+  next={size,life};
+  document.getElementById('cSize').textContent=size+' px';
+  document.getElementById('cLife').textContent=life+' ms';
+  document.getElementById('armMsg').innerHTML=
+    `Bu tur → boyut <b style="color:var(--c-size)">${size}px</b>, ömür <b style="color:var(--c-life)">${life}ms</b>. Daireler belirip kaybolacak!`;
+}
+
+/* ===== OYUN ===== */
+const arena=document.getElementById('arena'), arenaMsg=document.getElementById('arenaMsg');
+const cScore=document.getElementById('cScore'), cTime=document.getElementById('cTime');
+const startBtn=document.getElementById('startBtn');
+let score=0,endAt=0,tick=null,target=null,lifeT=null;
+
+startBtn.addEventListener('click',start);
+function start(){
+  if(playing||!next)return;
+  playing=true;score=0;cScore.textContent='0';startBtn.disabled=true;
+  arena.classList.remove('idle');arenaMsg.style.display='none';
+  endAt=performance.now()+ROUND_MS;spawn();
+  tick=setInterval(()=>{const l=Math.max(0,(endAt-performance.now())/1000);
+    cTime.textContent=l.toFixed(1);if(l<=0)end();},50);
+}
+function spawn(){
+  clearTimeout(lifeT); if(target)target.remove();
+  const s=next.size, pad=s/2+6, w=arena.clientWidth, h=arena.clientHeight;
+  const x=pad+Math.random()*(w-2*pad), y=pad+Math.random()*(h-2*pad);
+  target=document.createElement('div');target.className='target';
+  target.style.width=target.style.height=s+'px';
+  target.style.left=x+'px';target.style.top=y+'px';
+  const col=cssv('--c-size');target.style.background=col;target.style.color=col;
+  target.addEventListener('pointerdown',e=>{e.stopPropagation();score++;cScore.textContent=score;spawn();});
+  arena.appendChild(target);
+  lifeT=setTimeout(spawn,next.life);
+}
+function end(){
+  playing=false;clearInterval(tick);clearTimeout(lifeT);
+  if(target){target.remove();target=null;}cTime.textContent='15.0';
+  rows.push({size:next.size,life:next.life,score});
+  sheetSendRow({boyut:next.size, omur:next.life, skor:score});
+  arenaMsg.style.display='flex';
+  arenaMsg.querySelector('.big').textContent=`Tur bitti — ${score} vuruş`;
+  startBtn.disabled=false;renderData();armRound();
+}
+
+/* ===== VERİ KONTROL ===== */
+document.getElementById('simBtn').addEventListener('click',()=>{
+  for(let i=0;i<10;i++){
+    const size=Math.round(SIZE_MIN+Math.random()*(SIZE_MAX-SIZE_MIN));
+    const life=Math.round((LIFE_MIN+Math.random()*(LIFE_MAX-LIFE_MIN))/50)*50;
+    // gerçekçi üretici model: skor boyut ve ömürle artar + gürültü
+    const exp=-4 + 0.22*size + 0.011*life;
+    rows.push({size,life,score:Math.max(0,Math.round(randn(exp,2.6)))});
+  }
+  renderData();
+});
+document.getElementById('undoBtn').addEventListener('click',()=>{if(rows.length){rows.pop();renderData();}});
+document.getElementById('clearBtn').addEventListener('click',()=>{
+  if(!confirm('Tüm veriler silinsin mi?'))return;rows.length=0;resetOut();renderData();});
+function randn(m,sd){let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();
+  return m+sd*Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+
+function renderData(){
+  const tb=document.getElementById('dataBody');
+  if(!rows.length){tb.innerHTML='<tr><td colspan="4" class="empty">Henüz veri yok — oyna ya da örnek veri üret</td></tr>';drawPlots(null);return;}
+  tb.innerHTML=rows.map((r,i)=>`<tr><td>${i+1}</td><td>${r.size}</td><td>${r.life}</td><td><b>${r.score}</b></td></tr>`).join('');
+}
+
+/* ===== İSTATİSTİK YARDIMCILARI (t & F p-değeri) ===== */
+function logGamma(x){const c=[76.18009172947146,-86.50532032941677,24.01409824083091,
+  -1.231739572450155,0.1208650973866179e-2,-0.5395239384953e-5];
+  let xx=x,t=x+5.5;t-=(x+0.5)*Math.log(t);let s=1.000000000190015;
+  for(let j=0;j<6;j++){xx+=1;s+=c[j]/xx;}return -t+Math.log(2.5066282746310005*s/x);}
+function betacf(x,a,b){const MX=200,EPS=3e-12,FP=1e-30;
+  let qab=a+b,qap=a+1,qam=a-1,c=1,d=1-qab*x/qap;if(Math.abs(d)<FP)d=FP;d=1/d;let h=d;
+  for(let m=1;m<=MX;m++){let m2=2*m,aa=m*(b-m)*x/((qam+m2)*(a+m2));
+    d=1+aa*d;if(Math.abs(d)<FP)d=FP;c=1+aa/c;if(Math.abs(c)<FP)c=FP;d=1/d;h*=d*c;
+    aa=-(a+m)*(qab+m)*x/((a+m2)*(qap+m2));
+    d=1+aa*d;if(Math.abs(d)<FP)d=FP;c=1+aa/c;if(Math.abs(c)<FP)c=FP;d=1/d;
+    let del=d*c;h*=del;if(Math.abs(del-1)<EPS)break;}return h;}
+function betai(x,a,b){if(x<=0)return 0;if(x>=1)return 1;
+  const bt=Math.exp(logGamma(a+b)-logGamma(a)-logGamma(b)+a*Math.log(x)+b*Math.log(1-x));
+  return x<(a+1)/(a+b+2)?bt*betacf(x,a,b)/a:1-bt*betacf(1-x,b,a)/b;}
+function tP(t,df){return betai(df/(df+t*t),df/2,0.5);}            // iki yönlü
+function fP(F,d1,d2){if(F<=0||!isFinite(F))return 1;return betai(d2/(d2+d1*F),d2/2,d1/2);} // üst kuyruk
+
+/* ===== MATRİS TERSİ (Gauss-Jordan, kısmi pivot) ===== */
+function inverse(A){const n=A.length;
+  const M=A.map((r,i)=>r.concat(Array.from({length:n},(_,j)=>i===j?1:0)));
+  for(let col=0;col<n;col++){let p=col;
+    for(let r=col+1;r<n;r++)if(Math.abs(M[r][col])>Math.abs(M[p][col]))p=r;
+    if(Math.abs(M[p][col])<1e-12)return null;[M[col],M[p]]=[M[p],M[col]];
+    const d=M[col][col];for(let j=0;j<2*n;j++)M[col][j]/=d;
+    for(let r=0;r<n;r++){if(r===col)continue;const f=M[r][col];
+      for(let j=0;j<2*n;j++)M[r][j]-=f*M[col][j];}}
+  return M.map(r=>r.slice(n));}
+
+/* ===== OLS REGRESYON ===== */
+document.getElementById('runBtn').addEventListener('click',run);
+function run(){
+  const n=rows.length, p=3; // sabit + 2 yordayıcı
+  if(n<p+1){alert('Regresyon için en az '+(p+1)+' gözlem gerekir.\n"Örnek veri üret" ile hızlıca veri oluşturabilirsin.');return;}
+  const X=rows.map(r=>[1,r.size,r.life]), Y=rows.map(r=>r.score);
+  // XtX ve XtY
+  const XtX=Array.from({length:p},()=>Array(p).fill(0)), XtY=Array(p).fill(0);
+  for(let k=0;k<n;k++)for(let a=0;a<p;a++){XtY[a]+=X[k][a]*Y[k];
+    for(let b=0;b<p;b++)XtX[a][b]+=X[k][a]*X[k][b];}
+  const inv=inverse(XtX);
+  if(!inv){alert('Veri tekil (yordayıcılar çok benzer). Daha çeşitli turlar topla.');return;}
+  const beta=inv.map(row=>row.reduce((s,v,j)=>s+v*XtY[j],0)); // β = inv·XtY
+  // tahmin & artıklar
+  const yhat=X.map(x=>x.reduce((s,v,j)=>s+v*beta[j],0));
+  const ybar=Y.reduce((s,v)=>s+v,0)/n;
+  let sse=0,sst=0;Y.forEach((y,i)=>{sse+=(y-yhat[i])**2;sst+=(y-ybar)**2;});
+  const ssr=sst-sse, dfM=p-1, dfR=n-p;
+  const r2=sst>0?1-sse/sst:0, adj=sst>0?1-(sse/dfR)/(sst/(n-1)):0;
+  const mse=sse/dfR, F=ssr/dfM/(sse/dfR>0?sse/dfR:1e-12), pF=fP(F,dfM,dfR);
+  // katsayı std hataları: var(β)=mse·inv
+  const se=beta.map((_,j)=>Math.sqrt(Math.max(0,mse*inv[j][j])));
+  const tval=beta.map((b,j)=>se[j]>0?b/se[j]:0);
+  const pval=tval.map(t=>tP(Math.abs(t),dfR));
+
+  // çıktı: denklem
+  const f=(x,d=3)=>x.toFixed(d);
+  document.getElementById('fitEq').innerHTML=
+    `Skor = <span class="num">${f(beta[0],2)}</span> + <span class="num">${f(beta[1],3)}</span>·Boyut + <span class="num">${f(beta[2],4)}</span>·Ömür`;
+  // katsayı tablosu
+  const names=['Sabit (β₀)','Hedef Boyutu (β₁)','Hedef Ömrü (β₂)'];
+  document.getElementById('coefBody').innerHTML=beta.map((b,j)=>{
+    const sig=pval[j]<0.05;
+    return `<tr><td>${names[j]}</td><td><b>${f(b, j===0?2:(j===1?3:4))}</b></td><td>${f(se[j],4)}</td><td>${f(tval[j],2)}</td>
+      <td class="${sig?'sig-y':'sig-n'}">${fmtP(pval[j])}${sig?' *':''}</td></tr>`;}).join('');
+  // metrikler
+  set('mR2',f(r2,3));set('mAdjR2',f(adj,3));set('mF',isFinite(F)?f(F,2):'∞');
+  const mp=document.getElementById('mP');mp.textContent=fmtP(pF);mp.className=pF<0.05?'sig-y':'';
+  // yorum
+  const iv=document.getElementById('interp');iv.classList.add('show');
+  document.getElementById('ih').textContent=`Model toplam değişkenliğin %${(r2*100).toFixed(0)}’ini açıklıyor (R² = ${f(r2,3)})`;
+  document.getElementById('ip').innerHTML=
+    `<p>Hedef boyutu 1 px büyüdüğünde skor ortalama <b>${f(beta[1],3)}</b> birim ${beta[1]>=0?'artıyor':'azalıyor'}; ömür 100 ms uzadığında skor ortalama <b>${f(beta[2]*100,2)}</b> birim değişiyor (diğeri sabitken).</p>`+
+    `<p>Boyut katsayısı p = <b>${fmtP(pval[1])}</b>, ömür katsayısı p = <b>${fmtP(pval[2])}</b>. ${(pval[1]<0.05&&pval[2]<0.05)?'Her iki yordayıcı da anlamlı (p &lt; 0.05).':'Yıldızlı (p &lt; 0.05) olanlar anlamlı kabul edilir.'}</p>`+
+    `<p>Genel model testi: F(${dfM}, ${dfR}) = <b>${isFinite(F)?f(F,2):'∞'}</b>, p = <b>${fmtP(pF)}</b> → ${pF<0.05?'model bir bütün olarak anlamlı.':'model bir bütün olarak anlamlı değil; daha fazla veri topla.'}</p>`;
+
+  drawPlots({Y,yhat});
+}
+function set(id,v){document.getElementById(id).textContent=v;}
+function fmtP(p){return p<0.001?'<0.001':p.toFixed(4);}
+function resetOut(){
+  document.getElementById('fitEq').innerHTML='Skor = β₀ + β₁·Boyut + β₂·Ömür &nbsp;<span style="color:var(--paper-dim)">(hesaplanmadı)</span>';
+  document.getElementById('coefBody').innerHTML=
+    ['Sabit (β₀)','Hedef Boyutu (β₁)','Hedef Ömrü (β₂)'].map(n=>`<tr><td>${n}</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>`).join('');
+  ['mR2','mAdjR2','mF','mP'].forEach(id=>set(id,'—'));
+  document.getElementById('interp').classList.remove('show');
+}
+
+/* ===== GRAFİKLER ===== */
+function drawPlots(res){
+  drawPVA(res); drawRes(res);
+}
+function svgBase(svg,W,H){svg.innerHTML='';return {
+  add(tag,a,txt){const e=document.createElementNS('http://www.w3.org/2000/svg',tag);
+    for(const k in a)e.setAttribute(k,a[k]);if(txt!=null)e.textContent=txt;svg.appendChild(e);return e;}};}
+function emptyMsg(svg,W,H){svgBase(svg,W,H).add('text',{x:W/2,y:H/2,fill:cssv('--paper-dim'),
+  'font-size':13,'text-anchor':'middle','font-family':'JetBrains Mono'},'Önce regresyonu hesapla');}
+
+function drawPVA(res){
+  const svg=document.getElementById('pvaPlot'),W=360,H=320,pL=44,pR=14,pT=14,pB=40;
+  if(!res){emptyMsg(svg,W,H);return;}
+  const g=svgBase(svg,W,H);
+  const all=[...res.Y,...res.yhat],mn=Math.min(...all,0),mx=Math.max(...all,1);
+  const sx=v=>pL+(W-pL-pR)*(v-mn)/(mx-mn||1);
+  const sy=v=>pT+(H-pT-pB)*(1-(v-mn)/(mx-mn||1));
+  for(let i=0;i<=4;i++){const v=mn+(mx-mn)*i/4;
+    g.add('line',{x1:pL,y1:sy(v),x2:W-pR,y2:sy(v),stroke:cssv('--line'),opacity:.5});
+    g.add('text',{x:pL-6,y:sy(v)+4,fill:cssv('--paper-dim'),'font-size':10,'text-anchor':'end','font-family':'JetBrains Mono'},v.toFixed(0));}
+  // y = x referans
+  g.add('line',{x1:sx(mn),y1:sy(mn),x2:sx(mx),y2:sy(mx),stroke:cssv('--accent'),'stroke-width':2,'stroke-dasharray':'6 5'});
+  res.Y.forEach((y,i)=>g.add('circle',{cx:sx(res.yhat[i]),cy:sy(y),r:5,fill:cssv('--c-size'),opacity:.8,stroke:cssv('--ink'),'stroke-width':1.5}));
+  g.add('text',{x:W/2,y:H-8,fill:cssv('--paper-dim'),'font-size':11,'text-anchor':'middle','font-family':'JetBrains Mono'},'Tahmin (Ŷ)');
+  g.add('text',{x:14,y:H/2,fill:cssv('--paper-dim'),'font-size':11,'text-anchor':'middle','font-family':'JetBrains Mono',transform:`rotate(-90 14 ${H/2})`},'Gerçek (Y)');
+}
+function drawRes(res){
+  const svg=document.getElementById('resPlot'),W=360,H=320,pL=44,pR=14,pT=14,pB=40;
+  if(!res){emptyMsg(svg,W,H);return;}
+  const g=svgBase(svg,W,H);
+  const e=res.Y.map((y,i)=>y-res.yhat[i]);
+  const ax=Math.max(...e.map(Math.abs),1);
+  const fmn=Math.min(...res.yhat),fmx=Math.max(...res.yhat);
+  const sx=v=>pL+(W-pL-pR)*(v-fmn)/(fmx-fmn||1);
+  const sy=v=>pT+(H-pT-pB)*(1-(v+ax)/(2*ax));
+  for(let i=0;i<=4;i++){const v=-ax+2*ax*i/4;
+    g.add('line',{x1:pL,y1:sy(v),x2:W-pR,y2:sy(v),stroke:cssv('--line'),opacity:.5});
+    g.add('text',{x:pL-6,y:sy(v)+4,fill:cssv('--paper-dim'),'font-size':10,'text-anchor':'end','font-family':'JetBrains Mono'},v.toFixed(0));}
+  g.add('line',{x1:pL,y1:sy(0),x2:W-pR,y2:sy(0),stroke:cssv('--warn'),'stroke-width':2});
+  e.forEach((ei,i)=>g.add('circle',{cx:sx(res.yhat[i]),cy:sy(ei),r:5,fill:cssv('--c-life'),opacity:.8,stroke:cssv('--ink'),'stroke-width':1.5}));
+  g.add('text',{x:W/2,y:H-8,fill:cssv('--paper-dim'),'font-size':11,'text-anchor':'middle','font-family':'JetBrains Mono'},'Tahmin (Ŷ)');
+  g.add('text',{x:14,y:H/2,fill:cssv('--paper-dim'),'font-size':11,'text-anchor':'middle','font-family':'JetBrains Mono',transform:`rotate(-90 14 ${H/2})`},'Artık (Y−Ŷ)');
+}
+
+/* başlat */
+armRound();renderData();drawPlots(null);
+</script>
+</body>
+</html>

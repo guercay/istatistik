@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zorluk &amp; Performans — ANOVA Deneyi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,900;1,9..144,500&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0a1d22;
+    --ink-2:#0e272e;
+    --panel:#10303800;
+    --paper:#f3ead7;
+    --paper-dim:#c9bfa8;
+    --line:#2a4a52;
+    --easy:#5fd6a0;
+    --med:#f0b542;
+    --hard:#f0654f;
+    --accent:#7df0e0;
+    --shadow:0 18px 50px -20px rgba(0,0,0,.7);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    font-family:'Hanken Grotesk',sans-serif;
+    background:
+      radial-gradient(1100px 600px at 85% -10%, #16414a 0%, transparent 55%),
+      radial-gradient(900px 700px at -10% 110%, #123036 0%, transparent 50%),
+      var(--ink);
+    color:var(--paper);
+    line-height:1.55;
+    padding:clamp(14px,3vw,40px);
+    min-height:100vh;
+  }
+  .wrap{max-width:1080px;margin:0 auto}
+  .mono{font-family:'JetBrains Mono',monospace}
+
+  /* HEADER */
+  header{
+    border:1px solid var(--line);
+    border-radius:20px;
+    padding:clamp(22px,4vw,40px);
+    background:linear-gradient(160deg,rgba(20,55,62,.6),rgba(10,29,34,.3));
+    position:relative;overflow:hidden;
+    box-shadow:var(--shadow);
+  }
+  header::before{
+    content:"H₀: μ₁ = μ₂ = μ₃";
+    position:absolute;top:18px;right:22px;
+    font-family:'JetBrains Mono',monospace;font-size:13px;
+    color:var(--accent);opacity:.55;letter-spacing:.5px;
+  }
+  .tag{
+    font-family:'JetBrains Mono',monospace;font-size:12px;
+    letter-spacing:3px;text-transform:uppercase;color:var(--accent);
+    margin-bottom:14px;
+  }
+  h1{
+    font-family:'Fraunces',serif;font-weight:900;
+    font-size:clamp(30px,6vw,58px);line-height:1.02;
+    letter-spacing:-1px;margin-bottom:14px;
+  }
+  h1 em{font-style:italic;font-weight:500;color:var(--accent)}
+  .lead{max-width:62ch;color:var(--paper-dim);font-size:clamp(15px,2vw,18px)}
+
+  /* SECTIONS */
+  section{margin-top:clamp(22px,4vw,38px)}
+  .s-head{display:flex;align-items:baseline;gap:14px;margin-bottom:18px;flex-wrap:wrap}
+  .s-num{
+    font-family:'JetBrains Mono',monospace;font-size:13px;
+    color:var(--ink);background:var(--accent);
+    padding:3px 9px;border-radius:6px;font-weight:700;
+  }
+  .s-head h2{font-family:'Fraunces',serif;font-weight:600;font-size:clamp(22px,3.5vw,30px)}
+  .s-head p{color:var(--paper-dim);font-size:14px;width:100%;max-width:64ch}
+
+  .panel{
+    border:1px solid var(--line);border-radius:18px;
+    background:linear-gradient(165deg,rgba(16,48,56,.55),rgba(10,29,34,.25));
+    padding:clamp(18px,3vw,28px);
+  }
+
+  /* DIFFICULTY SELECTOR */
+  .diff-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px}
+  .diff{
+    flex:1;min-width:130px;cursor:pointer;
+    border:1.5px solid var(--line);border-radius:14px;
+    padding:16px;background:rgba(0,0,0,.15);
+    transition:.18s;position:relative;
+  }
+  .diff:hover{transform:translateY(-2px);border-color:var(--paper-dim)}
+  .diff.active{box-shadow:0 0 0 2px currentColor inset}
+  .diff[data-d="kolay"]{color:var(--easy)}
+  .diff[data-d="orta"]{color:var(--med)}
+  .diff[data-d="zor"]{color:var(--hard)}
+  .diff .dot{width:14px;height:14px;border-radius:50%;background:currentColor;margin-bottom:10px}
+  .diff .name{font-family:'Fraunces',serif;font-size:20px;font-weight:600;color:var(--paper)}
+  .diff .meta{font-size:12px;color:var(--paper-dim);margin-top:3px}
+  .diff .cnt{font-family:'JetBrains Mono',monospace;font-size:12px;margin-top:8px;color:currentColor}
+
+  /* ARENA */
+  .arena-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:16px;flex-wrap:wrap}
+  .stat{font-family:'JetBrains Mono',monospace}
+  .stat b{font-size:30px;font-weight:700}
+  .stat span{font-size:12px;color:var(--paper-dim);display:block;letter-spacing:1px;text-transform:uppercase}
+  #arena{
+    position:relative;width:100%;height:340px;
+    border:1.5px dashed var(--line);border-radius:14px;
+    background:
+      radial-gradient(circle at 50% 50%, rgba(125,240,224,.05), transparent 70%),
+      repeating-linear-gradient(0deg,transparent 0 38px,rgba(255,255,255,.018) 38px 39px),
+      repeating-linear-gradient(90deg,transparent 0 38px,rgba(255,255,255,.018) 38px 39px);
+    overflow:hidden;cursor:crosshair;user-select:none;
+  }
+  #arena.idle{cursor:default}
+  .target{position:absolute;border-radius:50%;cursor:pointer;
+    box-shadow:0 0 18px -2px currentColor, inset 0 0 12px rgba(255,255,255,.4);
+    transform:translate(-50%,-50%) scale(0);animation:pop .12s ease-out forwards}
+  @keyframes pop{to{transform:translate(-50%,-50%) scale(1)}}
+  .arena-msg{position:absolute;inset:0;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;text-align:center;padding:20px;gap:6px}
+  .arena-msg .big{font-family:'Fraunces',serif;font-size:26px}
+  .arena-msg .sub{color:var(--paper-dim);font-size:14px;max-width:42ch}
+
+  /* BUTTONS */
+  .btn{
+    font-family:'Hanken Grotesk',sans-serif;font-weight:700;font-size:15px;
+    border:none;border-radius:11px;padding:13px 22px;cursor:pointer;
+    background:var(--accent);color:var(--ink);transition:.15s;letter-spacing:.3px;
+  }
+  .btn:hover{filter:brightness(1.08);transform:translateY(-1px)}
+  .btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
+  .btn.ghost{background:transparent;color:var(--paper);border:1.5px solid var(--line)}
+  .btn.ghost:hover{border-color:var(--paper-dim)}
+  .btn-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+
+  /* DATA TABLE */
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  @media(max-width:620px){.grid3{grid-template-columns:1fr}}
+  .gcard{border:1px solid var(--line);border-radius:14px;padding:16px;background:rgba(0,0,0,.18)}
+  .gcard h3{font-family:'Fraunces',serif;font-size:18px;display:flex;align-items:center;gap:8px}
+  .gcard h3 .dot{width:11px;height:11px;border-radius:50%}
+  .vals{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--paper-dim);
+    margin-top:10px;line-height:1.8;word-break:break-word;min-height:24px}
+  .gstats{display:flex;gap:14px;margin-top:12px;font-family:'JetBrains Mono',monospace;font-size:13px}
+  .gstats div span{display:block;font-size:10px;color:var(--paper-dim);text-transform:uppercase}
+
+  /* ANOVA TABLE */
+  table{width:100%;border-collapse:collapse;font-family:'JetBrains Mono',monospace;font-size:13px;margin-top:6px}
+  th,td{padding:11px 10px;text-align:right;border-bottom:1px solid var(--line)}
+  th:first-child,td:first-child{text-align:left}
+  thead th{color:var(--accent);font-size:11px;text-transform:uppercase;letter-spacing:1px}
+  tbody tr:last-child td{border-bottom:none}
+  .verdict{margin-top:18px;padding:18px;border-radius:14px;border:1px solid var(--line);
+    background:rgba(0,0,0,.2);display:none}
+  .verdict.show{display:block}
+  .verdict .vh{font-family:'Fraunces',serif;font-size:21px;margin-bottom:8px}
+  .verdict.sig .vh{color:var(--easy)}
+  .verdict.nsig .vh{color:var(--med)}
+  .verdict p{color:var(--paper-dim);font-size:14.5px}
+  .pill{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:13px;
+    padding:4px 10px;border-radius:7px;background:var(--ink-2);border:1px solid var(--line);margin:2px 4px 2px 0}
+
+  /* PLOT */
+  .plot-wrap{margin-top:6px}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;font-size:13px;margin-top:14px;font-family:'JetBrains Mono',monospace}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .legend i{width:12px;height:12px;border-radius:50%;display:inline-block}
+  .legend .lm{width:18px;height:0;border-top:2px dashed var(--paper)}
+
+  footer{margin-top:40px;text-align:center;color:var(--paper-dim);font-size:13px;
+    border-top:1px solid var(--line);padding-top:20px}
+  .hint{font-size:12.5px;color:var(--paper-dim);margin-top:10px;font-style:italic}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="tag">Tek Yönlü ANOVA · Eğitim Simülasyonu</div>
+    <h1>Zorluk performansı <em>gerçekten</em> etkiler mi?</h1>
+    <p class="lead">Bir bağımsız değişken (oyun zorluğu: Kolay / Orta / Zor), bir bağımlı değişken (15 saniyede vurulan hedef = skor). Her turda topladığınız skorlar gruplara ayrılır; ardından tek yönlü ANOVA ile grupların ortalamaları arasındaki farkın <b>rastlantısal mı yoksa anlamlı mı</b> olduğunu test ederiz.</p>
+  </header>
+
+  <!-- 1. OYUN -->
+  <section>
+    <div class="s-head">
+      <span class="s-num">01</span>
+      <h2>Deneyi oyna</h2>
+      <p>Bir zorluk seç, <b>Başlat</b>’a bas ve 15 saniye boyunca beliren dairelere olabildiğince hızlı tıkla. Tur bitince skor ilgili gruba kaydedilir. Sağlıklı bir ANOVA için her gruba en az 3–5 tur önerilir.</p>
+    </div>
+    <div class="panel">
+      <div class="diff-row" id="diffRow">
+        <div class="diff active" data-d="kolay"><div class="dot"></div><div class="name">Kolay</div><div class="meta">Büyük &amp; yavaş hedef</div><div class="cnt">n = 0</div></div>
+        <div class="diff" data-d="orta"><div class="dot"></div><div class="name">Orta</div><div class="meta">Orta boy hedef</div><div class="cnt">n = 0</div></div>
+        <div class="diff" data-d="zor"><div class="dot"></div><div class="name">Zor</div><div class="meta">Küçük &amp; hızlı hedef</div><div class="cnt">n = 0</div></div>
+      </div>
+
+      <div class="arena-top">
+        <div class="stat"><b id="scoreV">0</b><span>Skor (vuruş)</span></div>
+        <div class="stat" style="text-align:right"><b id="timeV">15.0</b><span>Süre (sn)</span></div>
+      </div>
+
+      <div id="arena" class="idle">
+        <div class="arena-msg" id="arenaMsg">
+          <div class="big">Hazır olduğunda Başlat</div>
+          <div class="sub">Seçili zorluk: <b id="curDiff">Kolay</b>. Daireler belirip kaybolacak — kaçırma!</div>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn" id="startBtn">▶ Turu Başlat</button>
+      </div>
+      <div class="hint">İpucu: Sınıfta birden çok öğrenci sırayla oynayıp veri havuzunu büyütebilir.</div>
+    </div>
+  </section>
+
+  <!-- 2. VERİ -->
+  <section>
+    <div class="s-head">
+      <span class="s-num">02</span>
+      <h2>Toplanan veri</h2>
+      <p>Her grubun ham skorları, ortalaması (x̄) ve örneklem büyüklüğü (n). Hızlı bir ders gösterimi için örnek veriyi otomatik üretebilirsin.</p>
+    </div>
+    <div class="panel">
+      <div class="grid3" id="dataGrid">
+        <div class="gcard" data-d="kolay">
+          <h3><span class="dot" style="background:var(--easy)"></span>Kolay</h3>
+          <div class="vals" data-vals>—</div>
+          <div class="gstats">
+            <div><span>n</span><b data-n>0</b></div>
+            <div><span>x̄</span><b data-mean>—</b></div>
+            <div><span>s</span><b data-sd>—</b></div>
+          </div>
+        </div>
+        <div class="gcard" data-d="orta">
+          <h3><span class="dot" style="background:var(--med)"></span>Orta</h3>
+          <div class="vals" data-vals>—</div>
+          <div class="gstats">
+            <div><span>n</span><b data-n>0</b></div>
+            <div><span>x̄</span><b data-mean>—</b></div>
+            <div><span>s</span><b data-sd>—</b></div>
+          </div>
+        </div>
+        <div class="gcard" data-d="zor">
+          <h3><span class="dot" style="background:var(--hard)"></span>Zor</h3>
+          <div class="vals" data-vals>—</div>
+          <div class="gstats">
+            <div><span>n</span><b data-n>0</b></div>
+            <div><span>x̄</span><b data-mean>—</b></div>
+            <div><span>s</span><b data-sd>—</b></div>
+          </div>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn ghost" id="simBtn">⚗ Örnek veri üret (her gruba +8)</button>
+        <button class="btn ghost" id="undoBtn">↶ Son skoru sil</button>
+        <button class="btn ghost" id="clearBtn">⌫ Tümünü temizle</button>
+      </div>
+      <div style="margin-top:16px;border-top:1px solid var(--line);padding-top:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <button class="btn ghost" id="loadBtn">☁ Sınıf verisini yükle</button>
+        <span class="mono" id="syncStatus" style="font-size:12.5px;color:var(--paper-dim)">Google Sheets: yapılandırılmadı (yerel mod)</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. ANOVA -->
+  <section>
+    <div class="s-head">
+      <span class="s-num">03</span>
+      <h2>ANOVA tablosu</h2>
+      <p>F = Gruplar arası varyans / Grup içi varyans. F büyük ve p küçükse (genelde p &lt; 0.05) zorluğun performansa etkisi istatistiksel olarak anlamlıdır.</p>
+    </div>
+    <div class="panel">
+      <table>
+        <thead>
+          <tr><th>Varyans kaynağı</th><th>SS</th><th>df</th><th>MS</th><th>F</th><th>p</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Gruplar arası (zorluk etkisi)</td><td id="ssb">—</td><td id="dfb">—</td><td id="msb">—</td><td id="fval" rowspan="2" style="vertical-align:middle;font-size:18px;color:var(--accent)">—</td><td id="pval" rowspan="2" style="vertical-align:middle;font-size:16px">—</td></tr>
+          <tr><td>Grup içi (hata)</td><td id="ssw">—</td><td id="dfw">—</td><td id="msw">—</td></tr>
+          <tr><td><b>Toplam</b></td><td id="sst">—</td><td id="dft">—</td><td>—</td><td>η² = <b id="eta">—</b></td><td>—</td></tr>
+        </tbody>
+      </table>
+      <div class="btn-row">
+        <button class="btn" id="runBtn">∑ ANOVA’yı hesapla</button>
+      </div>
+      <div class="verdict" id="verdict">
+        <div class="vh" id="vh"></div>
+        <p id="vp"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. GÖRSEL -->
+  <section>
+    <div class="s-head">
+      <span class="s-num">04</span>
+      <h2>Görselleştirme</h2>
+      <p>Her nokta bir tur. Kesik çizgi grup ortalaması, gri çizgi genel ortalamadır. Noktaların kendi grubu içinde ne kadar dağıldığı = <b>grup içi varyans</b>; ortalamaların genel ortalamadan ne kadar uzakta olduğu = <b>gruplar arası varyans</b>.</p>
+    </div>
+    <div class="panel plot-wrap">
+      <svg id="plot" viewBox="0 0 700 360" style="width:100%;height:auto"></svg>
+      <div class="legend">
+        <span><i style="background:var(--easy)"></i>Kolay</span>
+        <span><i style="background:var(--med)"></i>Orta</span>
+        <span><i style="background:var(--hard)"></i>Zor</span>
+        <span><i class="lm"></i>Grup ort.</span>
+        <span><i class="lm" style="border-color:#7c93a0"></i>Genel ort.</span>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    Tek yönlü ANOVA eğitim simülasyonu · F-dağılımı p-değeri düzenlenmiş eksik beta fonksiyonu ile hesaplanır.
+  </footer>
+</div>
+
+<script>
+/* ---------- DURUM ---------- */
+const DIFF = {
+  kolay:{label:"Kolay", color:getCSS('--easy'), size:78, life:1600, simMean:30, simSd:3.2},
+  orta: {label:"Orta",  color:getCSS('--med'),  size:52, life:1050, simMean:20, simSd:3.0},
+  zor:  {label:"Zor",   color:getCSS('--hard'), size:30, life:650,  simMean:11, simSd:2.6},
+};
+const ROUND_MS = 15000;
+let current = "kolay";
+const data = {kolay:[], orta:[], zor:[]};
+let playing = false;
+
+function getCSS(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim();}
+
+/* ===================== GOOGLE SHEETS ENTEGRASYONU ===================== */
+/* Apps Script web uygulaması URL'ini tırnakların arasına yapıştır.       */
+/* Boş bırakırsan sayfa eskisi gibi yerel modda (yalnız bu cihaz) çalışır. */
+const SHEET_URL  = "";          // ← BURAYA web app adresini yapıştır
+const SHEET_NAME = "anova";     // Sheet'teki sekme adı (değiştirmene gerek yok)
+
+function setSync(msg){const el=document.getElementById('syncStatus'); if(el) el.textContent='Google Sheets: '+msg;}
+
+/* Bir turu Sheet'e gönder (yaz). CORS'a takılmamak için no-cors + text/plain. */
+function sheetSendRow(payload){
+  if(!SHEET_URL) return;
+  setSync('kaydediliyor…');
+  fetch(SHEET_URL,{
+    method:'POST', mode:'no-cors',
+    headers:{'Content-Type':'text/plain;charset=utf-8'},
+    body: JSON.stringify(Object.assign({sheet:SHEET_NAME}, payload))
+  }).then(()=>setSync('kaydedildi ✓')).catch(()=>setSync('kayıt hatası ✕'));
+}
+
+/* Tüm sınıf verisini çek (oku). CORS'tan kaçınmak için JSONP. */
+function sheetLoadClass(){
+  if(!SHEET_URL){alert('Önce kodun başındaki SHEET_URL değerini Apps Script web uygulaması adresinle doldur.');return;}
+  setSync('sınıf verisi yükleniyor…');
+  const cb='__cb_'+Date.now();
+  const s=document.createElement('script');
+  window[cb]=function(resp){
+    try{delete window[cb];}catch(e){window[cb]=undefined;} s.remove();
+    if(!resp||!resp.ok){setSync('yükleme hatası ✕');return;}
+    data.kolay=[];data.orta=[];data.zor=[];
+    resp.rows.forEach(r=>{               // r = [timestamp, zorluk, skor]
+      const z=String(r[1]).trim().toLowerCase(), v=Number(r[2]);
+      if(data[z]&&!isNaN(v)) data[z].push(v);
+    });
+    setSync('sınıf verisi yüklendi ✓ ('+resp.rows.length+' kayıt)');
+    resetAnova(); refresh();
+  };
+  s.src=SHEET_URL+'?sheet='+SHEET_NAME+'&callback='+cb;
+  s.onerror=()=>{setSync('yükleme hatası ✕');};
+  document.body.appendChild(s);
+}
+document.getElementById('loadBtn').addEventListener('click',sheetLoadClass);
+if(SHEET_URL) setSync('bağlandı — oynanan turlar otomatik kaydedilir');
+/* ===================================================================== */
+
+/* ---------- ZORLUK SEÇİMİ ---------- */
+document.querySelectorAll('.diff').forEach(el=>{
+  el.addEventListener('click',()=>{
+    if(playing) return;
+    current = el.dataset.d;
+    document.querySelectorAll('.diff').forEach(d=>d.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById('curDiff').textContent = DIFF[current].label;
+  });
+});
+
+/* ---------- OYUN ---------- */
+const arena = document.getElementById('arena');
+const arenaMsg = document.getElementById('arenaMsg');
+const scoreV = document.getElementById('scoreV');
+const timeV = document.getElementById('timeV');
+const startBtn = document.getElementById('startBtn');
+let score=0, endAt=0, tickTimer=null, target=null, lifeTimer=null;
+
+startBtn.addEventListener('click', startRound);
+
+function startRound(){
+  if(playing) return;
+  playing=true; score=0; scoreV.textContent='0';
+  startBtn.disabled=true; arena.classList.remove('idle');
+  arenaMsg.style.display='none';
+  document.querySelectorAll('.diff').forEach(d=>d.style.pointerEvents='none');
+  endAt = performance.now()+ROUND_MS;
+  spawn();
+  tickTimer = setInterval(()=>{
+    const left = Math.max(0,(endAt-performance.now())/1000);
+    timeV.textContent = left.toFixed(1);
+    if(left<=0) endRound();
+  },50);
+}
+
+function spawn(){
+  clearTimeout(lifeTimer);
+  if(target) target.remove();
+  const cfg = DIFF[current];
+  const pad = cfg.size/2+6;
+  const w = arena.clientWidth, h = arena.clientHeight;
+  const x = pad + Math.random()*(w-2*pad);
+  const y = pad + Math.random()*(h-2*pad);
+  target = document.createElement('div');
+  target.className='target';
+  target.style.width=target.style.height=cfg.size+'px';
+  target.style.left=x+'px'; target.style.top=y+'px';
+  target.style.background=cfg.color; target.style.color=cfg.color;
+  target.addEventListener('pointerdown',(e)=>{
+    e.stopPropagation();
+    score++; scoreV.textContent=score;
+    spawn();
+  });
+  arena.appendChild(target);
+  lifeTimer = setTimeout(spawn, cfg.life); // kaçırılırsa yer değiştir
+}
+
+function endRound(){
+  playing=false;
+  clearInterval(tickTimer); clearTimeout(lifeTimer);
+  if(target){target.remove();target=null;}
+  timeV.textContent='15.0';
+  data[current].push(score);
+  sheetSendRow({zorluk:current, skor:score});
+  arenaMsg.style.display='flex';
+  arenaMsg.querySelector('.big').textContent = `Tur bitti — ${DIFF[current].label}: ${score} vuruş`;
+  arenaMsg.querySelector('.sub').innerHTML = `Skor <b>${DIFF[current].label}</b> grubuna eklendi. Tekrar oynamak için Başlat’a bas.`;
+  startBtn.disabled=false;
+  document.querySelectorAll('.diff').forEach(d=>d.style.pointerEvents='auto');
+  refresh();
+}
+
+/* ---------- VERİ KONTROLLERİ ---------- */
+document.getElementById('simBtn').addEventListener('click',()=>{
+  Object.keys(data).forEach(d=>{
+    for(let i=0;i<8;i++){
+      const v = Math.round(randn(DIFF[d].simMean, DIFF[d].simSd));
+      data[d].push(Math.max(0,v));
+    }
+  });
+  refresh();
+});
+document.getElementById('undoBtn').addEventListener('click',()=>{
+  if(data[current].length){data[current].pop();refresh();}
+});
+document.getElementById('clearBtn').addEventListener('click',()=>{
+  if(!confirm('Tüm toplanan veriler silinsin mi?'))return;
+  data.kolay=[];data.orta=[];data.zor=[];
+  resetAnova(); refresh();
+});
+
+function randn(mean,sd){
+  let u=0,v=0; while(u===0)u=Math.random(); while(v===0)v=Math.random();
+  return mean + sd*Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);
+}
+
+/* ---------- ÖZET / GÖRÜNÜM ---------- */
+function mean(a){return a.reduce((s,x)=>s+x,0)/a.length;}
+function sd(a){if(a.length<2)return 0;const m=mean(a);return Math.sqrt(a.reduce((s,x)=>s+(x-m)**2,0)/(a.length-1));}
+
+function refresh(){
+  document.querySelectorAll('.diff').forEach(el=>{
+    el.querySelector('.cnt').textContent = 'n = '+data[el.dataset.d].length;
+  });
+  document.querySelectorAll('.gcard').forEach(card=>{
+    const d=card.dataset.d, arr=data[d];
+    card.querySelector('[data-vals]').textContent = arr.length? arr.join(', ') : '—';
+    card.querySelector('[data-n]').textContent = arr.length;
+    card.querySelector('[data-mean]').textContent = arr.length? mean(arr).toFixed(2):'—';
+    card.querySelector('[data-sd]').textContent = arr.length>1? sd(arr).toFixed(2):'—';
+  });
+  drawPlot();
+}
+
+/* ---------- İSTATİSTİK: F-dağılımı p-değeri ---------- */
+function logGamma(x){
+  const c=[76.18009172947146,-86.50532032941677,24.01409824083091,
+    -1.231739572450155,0.1208650973866179e-2,-0.5395239384953e-5];
+  let xx=x,tmp=x+5.5; tmp-=(x+0.5)*Math.log(tmp);
+  let ser=1.000000000190015;
+  for(let j=0;j<6;j++){xx+=1;ser+=c[j]/xx;}
+  return -tmp+Math.log(2.5066282746310005*ser/x);
+}
+function betacf(x,a,b){
+  const MAXIT=200,EPS=3e-12,FPMIN=1e-30;
+  let qab=a+b,qap=a+1,qam=a-1,c=1,d=1-qab*x/qap;
+  if(Math.abs(d)<FPMIN)d=FPMIN; d=1/d; let h=d;
+  for(let m=1;m<=MAXIT;m++){
+    let m2=2*m, aa=m*(b-m)*x/((qam+m2)*(a+m2));
+    d=1+aa*d; if(Math.abs(d)<FPMIN)d=FPMIN;
+    c=1+aa/c; if(Math.abs(c)<FPMIN)c=FPMIN;
+    d=1/d; h*=d*c;
+    aa=-(a+m)*(qab+m)*x/((a+m2)*(qap+m2));
+    d=1+aa*d; if(Math.abs(d)<FPMIN)d=FPMIN;
+    c=1+aa/c; if(Math.abs(c)<FPMIN)c=FPMIN;
+    d=1/d; let del=d*c; h*=del;
+    if(Math.abs(del-1)<EPS)break;
+  }
+  return h;
+}
+function betai(x,a,b){
+  if(x<=0)return 0; if(x>=1)return 1;
+  const bt=Math.exp(logGamma(a+b)-logGamma(a)-logGamma(b)+a*Math.log(x)+b*Math.log(1-x));
+  return x<(a+1)/(a+b+2) ? bt*betacf(x,a,b)/a : 1-bt*betacf(1-x,b,a)/b;
+}
+function fPvalue(F,df1,df2){
+  if(F<=0||!isFinite(F))return 1;
+  const x=df2/(df2+df1*F);
+  return betai(x,df2/2,df1/2); // üst kuyruk
+}
+
+/* ---------- ANOVA ---------- */
+document.getElementById('runBtn').addEventListener('click',runAnova);
+
+function runAnova(){
+  const groups = [data.kolay,data.orta,data.zor].filter(g=>g.length>0);
+  if(groups.length<2 || groups.some(g=>g.length<2)){
+    alert('ANOVA için en az 2 grup ve her grupta en az 2 veri gerekir.\nÖrnek veri üret butonunu kullanabilirsin.');
+    return;
+  }
+  const all=[].concat(...groups), N=all.length, k=groups.length;
+  const gm=mean(all);
+  let ssb=0,ssw=0;
+  groups.forEach(g=>{const m=mean(g); ssb+=g.length*(m-gm)**2; g.forEach(v=>ssw+=(v-m)**2);});
+  const sst=ssb+ssw, dfb=k-1, dfw=N-k, dft=N-1;
+  const msb=ssb/dfb, msw=ssw/dfw, F=msw>0?msb/msw:Infinity;
+  const p=fPvalue(F,dfb,dfw), eta=ssb/sst;
+
+  setT('ssb',ssb.toFixed(2)); setT('dfb',dfb); setT('msb',msb.toFixed(2));
+  setT('ssw',ssw.toFixed(2)); setT('dfw',dfw); setT('msw',msw.toFixed(2));
+  setT('sst',sst.toFixed(2)); setT('dft',dft);
+  setT('fval',isFinite(F)?F.toFixed(3):'∞');
+  setT('pval',formatP(p));
+  setT('eta',eta.toFixed(3));
+
+  const v=document.getElementById('verdict');
+  v.className='verdict show '+(p<0.05?'sig':'nsig');
+  if(p<0.05){
+    document.getElementById('vh').textContent='✓ Anlamlı fark var (p < 0.05)';
+    document.getElementById('vp').innerHTML=
+      `F(${dfb}, ${dfw}) = <b>${F.toFixed(2)}</b>, p = <b>${formatP(p)}</b>. H₀ reddedilir: zorluk seviyeleri arasındaki ortalama skor farkı rastlantıyla açıklanamaz. `+
+      `Etki büyüklüğü η² = <b>${eta.toFixed(3)}</b> → toplam değişkenliğin yaklaşık <b>%${(eta*100).toFixed(0)}</b>’i zorluk faktöründen kaynaklanıyor. `+
+      `<br><span class="pill">Sonraki adım</span> Hangi ikilinin farklı olduğunu görmek için post-hoc test (ör. Tukey HSD) gerekir.`;
+  }else{
+    document.getElementById('vh').textContent='✕ Anlamlı fark yok (p ≥ 0.05)';
+    document.getElementById('vp').innerHTML=
+      `F(${dfb}, ${dfw}) = <b>${F.toFixed(2)}</b>, p = <b>${formatP(p)}</b>. H₀ reddedilemez: eldeki veriyle zorluğun performansa etkisi istatistiksel olarak gösterilemedi. `+
+      `Grup içi dağılım, gruplar arası farkı bastırıyor olabilir — daha fazla tur toplamayı dene.`;
+  }
+  drawPlot();
+}
+function setT(id,v){document.getElementById(id).textContent=v;}
+function formatP(p){return p<0.001?'< 0.001':p.toFixed(4);}
+function resetAnova(){
+  ['ssb','dfb','msb','ssw','dfw','msw','sst','dft','fval','pval','eta'].forEach(id=>setT(id,'—'));
+  document.getElementById('verdict').className='verdict';
+}
+
+/* ---------- STRIP PLOT ---------- */
+function drawPlot(){
+  const svg=document.getElementById('plot');
+  const W=700,H=360,padL=46,padR=20,padT=20,padB=46;
+  const order=['kolay','orta','zor'];
+  const all=[].concat(...order.map(d=>data[d]));
+  svg.innerHTML='';
+  if(!all.length){
+    svg.innerHTML=`<text x="${W/2}" y="${H/2}" fill="${getCSS('--paper-dim')}" font-size="15" text-anchor="middle" font-family="JetBrains Mono">Henüz veri yok — oyna ya da örnek veri üret</text>`;
+    return;
+  }
+  const maxV=Math.max(...all,1), minV=0;
+  const yOf=v=>padT+(H-padT-padB)*(1-(v-minV)/(maxV-minV||1));
+  const colW=(W-padL-padR)/3;
+
+  // y ekseni
+  for(let i=0;i<=5;i++){
+    const val=minV+(maxV-minV)*i/5, y=yOf(val);
+    add('line',{x1:padL,y1:y,x2:W-padR,y2:y,stroke:getCSS('--line'),'stroke-width':1,opacity:.6});
+    add('text',{x:padL-8,y:y+4,fill:getCSS('--paper-dim'),'font-size':11,'text-anchor':'end','font-family':'JetBrains Mono'},val.toFixed(0));
+  }
+  // genel ortalama
+  const gm=mean(all), gy=yOf(gm);
+  add('line',{x1:padL,y1:gy,x2:W-padR,y2:gy,stroke:'#7c93a0','stroke-width':2,'stroke-dasharray':'6 5'});
+
+  order.forEach((d,gi)=>{
+    const arr=data[d]; const cx=padL+colW*gi+colW/2; const col=DIFF[d].color;
+    add('text',{x:cx,y:H-padB+22,fill:getCSS('--paper'),'font-size':13,'text-anchor':'middle','font-family':'Fraunces'},DIFF[d].label);
+    if(!arr.length)return;
+    arr.forEach((v,i)=>{
+      const jitter=((i%5)-2)*9 + (Math.random()-0.5)*4;
+      add('circle',{cx:cx+jitter,cy:yOf(v),r:6,fill:col,opacity:.82,stroke:getCSS('--ink'),'stroke-width':1.5});
+    });
+    const m=mean(arr), my=yOf(m);
+    add('line',{x1:cx-colW*0.32,y1:my,x2:cx+colW*0.32,y2:my,stroke:getCSS('--paper'),'stroke-width':2.5,'stroke-dasharray':'7 4'});
+    add('text',{x:cx+colW*0.32+4,y:my+4,fill:col,'font-size':12,'font-family':'JetBrains Mono','font-weight':700},m.toFixed(1));
+  });
+
+  function add(tag,attrs,text){
+    const el=document.createElementNS('http://www.w3.org/2000/svg',tag);
+    for(const k in attrs)el.setAttribute(k,attrs[k]);
+    if(text!=null)el.textContent=text;
+    svg.appendChild(el);
+  }
+}
+
+/* ilk render */
+refresh();
+window.addEventListener('resize',drawPlot);
+</script>
+</body>
+</html>
