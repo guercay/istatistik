@@ -335,7 +335,7 @@ function getCSS(v){return getComputedStyle(document.documentElement).getProperty
 /* ===================== GOOGLE SHEETS ENTEGRASYONU ===================== */
 /* Apps Script web uygulaması URL'ini tırnakların arasına yapıştır.       */
 /* Boş bırakırsan sayfa eskisi gibi yerel modda (yalnız bu cihaz) çalışır. */
-const SHEET_URL  = "https://script.google.com/macros/s/AKfycbzESFaLw1OneYEOcW6xOrFCFo3OHGJV5xZaFRF7Hm0gEh1jljlhZKZIPhgXh2wHnyGy/exec";
+const SHEET_URL  = "https://script.google.com/macros/s/AKfycbz_DS8VicxVQtSHgehTpdbIEeoAZ262PcFqlkmpmhFIx2MEp4ybHnoQ6U7sBXdhkpTL/exec";
 const SHEET_NAME = "anova";     // Sheet'teki sekme adı (değiştirmene gerek yok)
 
 function setSync(msg){const el=document.getElementById('syncStatus'); if(el) el.textContent='Google Sheets: '+msg;}
@@ -351,26 +351,29 @@ function sheetSendRow(payload){
   }).then(()=>setSync('kaydedildi ✓')).catch(()=>setSync('kayıt hatası ✕'));
 }
 
-/* Tüm sınıf verisini çek (oku). CORS'tan kaçınmak için JSONP. */
+/* Tüm sınıf verisini çek (oku). Önce fetch GET, olmazsa JSONP'ye düş. */
+function applyClassRows(resp){
+  if(!resp||!resp.ok){setSync('yükleme hatası ✕');return;}
+  data.kolay=[];data.orta=[];data.zor=[];
+  (resp.rows||[]).forEach(r=>{               // r = [zaman, zorluk, skor]
+    const z=String(r[1]).trim().toLowerCase(), v=Number(r[2]);
+    if(data[z]&&!isNaN(v)) data[z].push(v);
+  });
+  setSync('sınıf verisi yüklendi ✓ ('+(resp.rows?resp.rows.length:0)+' kayıt)');
+  resetAnova(); refresh();
+}
+function loadViaJsonp(){
+  const cb='__cb_'+Date.now();
+  const s=document.createElement('script');
+  window[cb]=function(resp){try{delete window[cb];}catch(e){window[cb]=undefined;}s.remove();applyClassRows(resp);};
+  s.onerror=()=>{s.remove();setSync('yükleme hatası ✕');};
+  s.src=SHEET_URL+'?sheet='+SHEET_NAME+'&callback='+cb;
+  document.body.appendChild(s);
+}
 function sheetLoadClass(){
   if(!SHEET_URL){alert('Önce kodun başındaki SHEET_URL değerini Apps Script web uygulaması adresinle doldur.');return;}
   setSync('sınıf verisi yükleniyor…');
-  const cb='__cb_'+Date.now();
-  const s=document.createElement('script');
-  window[cb]=function(resp){
-    try{delete window[cb];}catch(e){window[cb]=undefined;} s.remove();
-    if(!resp||!resp.ok){setSync('yükleme hatası ✕');return;}
-    data.kolay=[];data.orta=[];data.zor=[];
-    resp.rows.forEach(r=>{               // r = [timestamp, zorluk, skor]
-      const z=String(r[1]).trim().toLowerCase(), v=Number(r[2]);
-      if(data[z]&&!isNaN(v)) data[z].push(v);
-    });
-    setSync('sınıf verisi yüklendi ✓ ('+resp.rows.length+' kayıt)');
-    resetAnova(); refresh();
-  };
-  s.src=SHEET_URL+'?sheet='+SHEET_NAME+'&callback='+cb;
-  s.onerror=()=>{setSync('yükleme hatası ✕');};
-  document.body.appendChild(s);
+  fetch(SHEET_URL+'?sheet='+SHEET_NAME).then(r=>r.json()).then(applyClassRows).catch(loadViaJsonp);
 }
 document.getElementById('loadBtn').addEventListener('click',sheetLoadClass);
 if(SHEET_URL) setSync('bağlandı — oynanan turlar otomatik kaydedilir');

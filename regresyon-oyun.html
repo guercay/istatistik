@@ -263,7 +263,7 @@ let next=null, playing=false;
 /* ===================== GOOGLE SHEETS ENTEGRASYONU ===================== */
 /* Apps Script web uygulaması URL'ini tırnakların arasına yapıştır.       */
 /* Boş bırakırsan sayfa eskisi gibi yerel modda (yalnız bu cihaz) çalışır. */
-const SHEET_URL  = "https://script.google.com/macros/s/AKfycbzESFaLw1OneYEOcW6xOrFCFo3OHGJV5xZaFRF7Hm0gEh1jljlhZKZIPhgXh2wHnyGy/exec";
+const SHEET_URL  = "https://script.google.com/macros/s/AKfycbz_DS8VicxVQtSHgehTpdbIEeoAZ262PcFqlkmpmhFIx2MEp4ybHnoQ6U7sBXdhkpTL/exec";
 const SHEET_NAME = "regresyon";  // Sheet'teki sekme adı
 
 function setSync(msg){const el=document.getElementById('syncStatus'); if(el) el.textContent='Google Sheets: '+msg;}
@@ -278,25 +278,28 @@ function sheetSendRow(payload){
   }).then(()=>setSync('kaydedildi ✓')).catch(()=>setSync('kayıt hatası ✕'));
 }
 
+function applyClassRows(resp){
+  if(!resp||!resp.ok){setSync('yükleme hatası ✕');return;}
+  rows.length=0;
+  (resp.rows||[]).forEach(r=>{               // r = [zaman, boyut, omur, skor]
+    const o={size:Number(r[1]), life:Number(r[2]), score:Number(r[3])};
+    if(!isNaN(o.size)&&!isNaN(o.life)&&!isNaN(o.score)) rows.push(o);
+  });
+  setSync('sınıf verisi yüklendi ✓ ('+rows.length+' kayıt)');
+  resetOut(); renderData();
+}
+function loadViaJsonp(){
+  const cb='__cb_'+Date.now();
+  const s=document.createElement('script');
+  window[cb]=function(resp){try{delete window[cb];}catch(e){window[cb]=undefined;}s.remove();applyClassRows(resp);};
+  s.onerror=()=>{s.remove();setSync('yükleme hatası ✕');};
+  s.src=SHEET_URL+'?sheet='+SHEET_NAME+'&callback='+cb;
+  document.body.appendChild(s);
+}
 function sheetLoadClass(){
   if(!SHEET_URL){alert('Önce kodun başındaki SHEET_URL değerini Apps Script web uygulaması adresinle doldur.');return;}
   setSync('sınıf verisi yükleniyor…');
-  const cb='__cb_'+Date.now();
-  const s=document.createElement('script');
-  window[cb]=function(resp){
-    try{delete window[cb];}catch(e){window[cb]=undefined;} s.remove();
-    if(!resp||!resp.ok){setSync('yükleme hatası ✕');return;}
-    rows.length=0;
-    resp.rows.forEach(r=>{               // r = [timestamp, boyut, omur, skor]
-      const o={size:Number(r[1]), life:Number(r[2]), score:Number(r[3])};
-      if(!isNaN(o.size)&&!isNaN(o.life)&&!isNaN(o.score)) rows.push(o);
-    });
-    setSync('sınıf verisi yüklendi ✓ ('+rows.length+' kayıt)');
-    resetOut(); renderData();
-  };
-  s.src=SHEET_URL+'?sheet='+SHEET_NAME+'&callback='+cb;
-  s.onerror=()=>{setSync('yükleme hatası ✕');};
-  document.body.appendChild(s);
+  fetch(SHEET_URL+'?sheet='+SHEET_NAME).then(r=>r.json()).then(applyClassRows).catch(loadViaJsonp);
 }
 document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('loadBtn').addEventListener('click',sheetLoadClass);
